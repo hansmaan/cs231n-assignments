@@ -145,11 +145,12 @@ def softmax_loss(x, y):
     # TODO: Copy over your solution from Assignment 1.                        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    np.seterr(divide='ignore', invalid='ignore', over='ignore')
 
     x_exp = np.exp(x)
     x_exp_total = np.sum(x_exp, axis=1)
     x_exp_real = x_exp[np.arange(x.shape[0]), y]
-    losses = -np.log(x_exp_real/x_exp_total)
+    losses = np.log(x_exp_total) - np.log(x_exp_real)
     loss = np.sum(losses)
     loss /= x.shape[0]
 
@@ -238,7 +239,19 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        sample_mean = np.mean(x, axis=0)
+        sample_var = np.var(x, axis=0)
+
+        running_mean = momentum*running_mean + (1-momentum)*sample_mean
+        running_var = momentum*running_var + (1-momentum)*sample_var
+
+        out = (x-sample_mean)/np.sqrt(sample_var+eps)
+
+        x_hat = out
+
+        out = gamma*out + beta
+
+        cache = (gamma, beta, sample_mean, sample_var, eps, x, x_hat)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -253,7 +266,15 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        sample_mean = np.mean(x, axis=0)
+        sample_var = np.var(x, axis=0)
+
+        running_mean = momentum*running_mean + (1-momentum)*sample_mean
+        running_var = momentum*running_var + (1-momentum)*sample_var
+
+        out = (x-running_mean)/np.sqrt(running_var+eps)
+
+        out = gamma*out + beta
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         #######################################################################
@@ -294,7 +315,22 @@ def batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dx = np.zeros_like(dout)
+
+    gamma, beta, sample_mean, sample_var, eps, x, x_hat = cache
+
+    dl_dx_hat = dout*gamma
+    temp_sigma = -1/2*(x-sample_mean)/(np.power(sample_var+eps, 1.5))
+    dl_dsigma = np.sum(dl_dx_hat*temp_sigma, axis=0)
+    temp_mean = dl_dx_hat*-1/np.sqrt(sample_var + eps)
+    dl_dmean = np.sum(temp_mean, axis=0)
+    
+    dx += dl_dmean/dout.shape[0]
+    dx += dl_dx_hat/np.sqrt(sample_var+eps)
+    dx += 2/dout.shape[0]*(x-sample_mean)*dl_dsigma
+
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*x_hat, axis=0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -328,7 +364,12 @@ def batchnorm_backward_alt(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    gamma, beta, sample_mean, sample_var, eps, x, x_hat = cache
+
+    
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*x_hat, axis=0)
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -373,7 +414,19 @@ def layernorm_forward(x, gamma, beta, ln_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    sample_mean = np.mean(x, axis=1)
+    sample_var = np.var(x, axis=1)
+    mean_broadcast = np.reshape(np.repeat(sample_mean, x.shape[1]), (-1, x.shape[1]))
+    var_broadcast = np.reshape(np.repeat(sample_var, x.shape[1]), (-1, x.shape[1]))
+
+    out = (x-mean_broadcast)/np.sqrt(var_broadcast+eps)
+    x_hat = out
+
+    out = gamma*out + beta
+
+    cache = (gamma, beta, mean_broadcast, var_broadcast, eps, x, x_hat)
+
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -407,7 +460,24 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dx = np.zeros_like(dout)
+
+    gamma, beta, sample_mean, sample_var, eps, x, x_hat = cache
+
+    dl_dx_hat = dout*gamma
+    temp_sigma = -1/2*(x-sample_mean)/(np.power(sample_var+eps, 1.5))
+    dl_dsigma = np.sum(dl_dx_hat*temp_sigma, axis=1)
+    dl_dsigma = np.reshape(np.repeat(dl_dsigma, x.shape[1]), (-1, x.shape[1]))
+    temp_mean = dl_dx_hat*-1/np.sqrt(sample_var + eps)
+    dl_dmean = np.sum(temp_mean, axis=1)
+    dl_dmean = np.reshape(np.repeat(dl_dmean, x.shape[1]), (-1, x.shape[1]))
+    
+    dx += dl_dmean/dout.shape[1]
+    dx += dl_dx_hat/np.sqrt(sample_var+eps)
+    dx += 2/dout.shape[1]*(x-sample_mean)*dl_dsigma
+
+    dbeta = np.sum(dout, axis=0)
+    dgamma = np.sum(dout*x_hat, axis=0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
